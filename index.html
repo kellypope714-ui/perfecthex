@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="manifest" href="manifest.json">
+<title>PerfectHex</title>
+<style>
+  :root{
+    --bg:#0e1117;
+    --panel:#151a23;
+    --panel-2:#1b2230;
+    --ink:#e6edf3;
+    --muted:#a6b3c3;
+    --border:#2a3242;
+    --accent:#7dc4ff;
+    --good:#34d399;
+    --bad:#f87171;
+    --warn:#fbbf24;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:linear-gradient(180deg,#0c0f15,#121927); color:var(--ink);
+    font-family:var(--sans);
+  }
+  header{padding:20px 16px; border-bottom:1px solid var(--border); background:#0f1420; position:sticky; top:0; z-index:5}
+  h1{margin:0 0 6px 0; font-size:22px; letter-spacing:.2px}
+  .subtitle{color:var(--muted); font-size:13px}
+  .container{max-width:1100px; margin:0 auto; padding:16px}
+  .grid{display:grid; gap:14px}
+  @media(min-width:880px){ .grid{grid-template-columns: 1.1fr .9fr} }
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px}
+  .section-title{margin:0 0 12px; font-size:16px; letter-spacing:.2px}
+  .palette{display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:12px}
+  .slot{background:var(--panel-2); border:1px solid var(--border); border-radius:10px; padding:12px}
+  .slot-header{display:flex; align-items:center; gap:10px; margin-bottom:10px}
+  .swatch{width:40px; height:40px; border-radius:8px; border:1px solid rgba(255,255,255,.15)}
+  .fields{display:grid; gap:6px; grid-template-columns: 1fr 1fr}
+  .fields .full{grid-column:1/-1}
+  label{font-size:12px; color:var(--muted)}
+  input[type="text"]{
+    width:100%; padding:8px 9px; border-radius:8px; border:1px solid var(--border);
+    background:#0f1522; color:var(--ink); font-family:var(--mono); font-size:13px;
+  }
+  input[type="color"]{
+    width:100%; height:36px; border-radius:8px; border:1px solid var(--border); background:#0f1522
+  }
+  .meta{margin-top:8px; font-size:12px; color:var(--muted); display:flex; gap:12px; flex-wrap:wrap}
+  .click-tip{font-size:12px; color:#9ab6d6; margin-top:6px}
+  .btn{
+    display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; border:1px solid var(--border);
+    background:#0f1420; color:var(--ink); cursor:pointer; font-size:13px;
+  }
+  .btn:active{transform:translateY(1px)}
+  .selected{outline:2px solid var(--accent); outline-offset:2px}
+  .stack{display:grid; gap:10px}
+  .swatch-row{display:grid; grid-template-columns: repeat(auto-fit,minmax(90px,1fr)); gap:6px}
+  .chip{border:1px solid var(--border); border-radius:8px; overflow:hidden}
+  .chip-top{height:44px}
+  .chip-meta{padding:6px 8px; font-size:12px; display:flex; justify-content:space-between; gap:8px}
+  .harmony{margin-top:8px}
+  .h-title{font-weight:600; font-size:13px; margin:10px 0 6px}
+  .def{font-size:12px; color:var(--muted); margin-bottom:6px}
+  .contrast{display:grid; gap:10px}
+  .row{display:grid; grid-template-columns: 1fr 1fr; gap:10px}
+  .ratio{font-family:var(--mono); font-size:13px}
+  .badge{padding:2px 6px; border-radius:999px; font-size:12px; border:1px solid var(--border)}
+  .ok{background:rgba(52,211,153,.12); color:#8ef0c9; border-color:rgba(52,211,153,.3)}
+  .fail{background:rgba(248,113,113,.12); color:#f7a7a7; border-color:rgba(248,113,113,.3)}
+  .suggest{display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:8px}
+  .suggest-card{border:1px solid var(--border); border-radius:10px; overflow:hidden}
+  .suggest-top{height:48px}
+  .suggest-meta{padding:8px; display:grid; gap:4px; font-size:12px}
+  .sample{padding:8px; font-weight:600; border-top:1px dashed var(--border)}
+  .divider{height:1px; background:var(--border); margin:8px 0}
+  .small{font-size:12px; color:var(--muted)}
+  .note{font-size:12px; color:#a3b8d9}
+</style>
+</head>
+<body>
+  <header>
+    <h1>PerfectHex</h1>
+    <div class="subtitle">Create, edit, and test color palette with harmony generation and accessibility checking.</div>
+  </header>
+
+  <div class="container grid">
+    <!-- Left: Palette + Details -->
+    <div class="stack">
+      <section class="panel">
+        <h2 class="section-title">Color palette editor</h2>
+        <div class="palette" id="palette"></div>
+        <div class="click-tip">Tap a color slot to view its shades, tints, tones, and harmonies.</div>
+      </section>
+
+      <section class="panel" id="detailsPanel" hidden>
+        <h2 class="section-title" id="detailsTitle">Selected color details</h2>
+        <div class="stack" id="detailsContent"></div>
+      </section>
+    </div>
+
+    <!-- Right: Contrast Checker -->
+    <aside class="panel">
+      <h2 class="section-title">Text contrast checker with suggestions (AAA 7:1)</h2>
+      <div class="contrast">
+        <div class="row">
+          <div>
+            <label>Background color (hex)</label>
+            <input type="text" id="bgHex" value="#ffcc33" />
+          </div>
+          <div>
+            <label>Text color (hex)</label>
+            <input type="text" id="txHex" value="#3366cc" />
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn" id="checkBtn">Check contrast</button>
+          <div class="ratio" id="ratioOut"></div>
+        </div>
+        <div id="sampleOut" class="panel" style="background:#1a2230"></div>
+        <div class="divider"></div>
+        <div class="small">Suggestions that meet AAA (≥ 7:1) for the current background.</div>
+        <div class="suggest" id="suggestions"></div>
+      </div>
+    </aside>
+  </div>
+
+<script>
+/* ---------- Utilities ---------- */
+const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
+const pad2=v=>v.toString(16).padStart(2,'0');
+
+function normHex(hex){
+  if(!hex) return null;
+  hex = hex.trim();
+  if(hex[0] !== '#') hex = '#'+hex;
+  if(/^#([0-9a-f]{3})$/i.test(hex)){
+    const [h1,h2,h3]=hex.slice(1);
+    return '#'+h1+h1+h2+h2+h3+h3;
+  }
+  if(/^#([0-9a-f]{6})$/i.test(hex)) return hex.toLowerCase();
+  return null;
+}
+function hexToRgb(hex){
+  hex = normHex(hex); if(!hex) return null;
+  const n = parseInt(hex.slice(1),16);
+  return {r:(n>>16)&255, g:(n>>8)&255, b:n&255};
+}
+function rgbToHex(r,g,b){ return '#'+pad2(r)+pad2(g)+pad2(b); }
+function rgbToHsl(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b);
+  let h,s,l=(max+min)/2;
+  if(max===min){ h=0; s=0; }
+  else{
+    const d=max-min;
+    s = l>0.5 ? d/(2-max-min) : d/(max+min);
+    switch(max){
+      case r: h=(g-b)/d+(g<b?6:0); break;
+      case g: h=(b-r)/d+2; break;
+      case b: h=(r-g)/d+4; break;
+    }
+    h*=60;
+  }
+  return {h, s, l};
+}
+function hslToRgb(h,s,l){
+  h/=360;
+  let r,g,b;
+  if(s===0){ r=g=b=l; }
+  else{
+    const hue2rgb=(p,q,t)=>{
+      if(t<0) t+=1;
+      if(t>1) t-=1;
+      if(t<1/6) return p+(q-p)*6*t;
+      if(t<1/2) return q;
+      if(t<2/3) return p+(q-p)*(2/3-t)*6;
+      return p;
+    };
+    const q = l<0.5 ? l*(1+s) : l+s-l*s;
+    const p = 2*l - q;
+    r=hue2rgb(p,q,h+1/3);
+    g=hue2rgb(p,q,h);
+    b=hue2rgb(p,q,h-1/3);
+  }
+  return {r:Math.round(r*255), g:Math.round(g*255), b:Math.round(b*255)};
+}
+function hslToHex(h,s,l){ const {r,g,b} = hslToRgb(h,s,l); return rgbToHex(r,g,b); }
+function luminance({r,g,b}){
+  const f=v=>{
+    v/=255;
+    return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4);
+  };
+  const R=f(r), G=f(g), B=f(b);
+  return 0.2126*R + 0.7152*G + 0.0722*B;
+}
+function contrastRatio(rgb1,rgb2){
+  const L1=luminance(rgb1), L2=luminance(rgb2);
+  const hi=Math.max(L1,L2), lo=Math.min(L1,L2);
+  return (hi+0.05)/(lo+0.05);
+}
+
+/* ---------- Color naming (coarse) ---------- */
+function nameFromHue(hex){
+  const rgb = hexToRgb(hex); if(!rgb) return 'Invalid';
+  const {h,s,l} = rgbToHsl(rgb.r,rgb.g,rgb.b);
+  if(s<0.08 && l>0.85) return 'White';
+  if(s<0.08 && l<0.15) return 'Black';
+  if(s<0.08) return 'Gray';
+  const hue=h;
+  if(hue<15 || hue>=345) return 'Red';
+  if(hue<45) return 'Orange';
+  if(hue<65) return 'Yellow';
+  if(hue<85) return 'Lime';
+  if(hue<150) return 'Green';
+  if(hue<195) return 'Cyan';
+  if(hue<255) return 'Blue';
+  if(hue<285) return 'Indigo';
+  if(hue<330) return 'Violet';
+  return 'Magenta';
+}
+
+/* ---------- Shades / Tints / Tones ---------- */
+function buildVariants(hex){
+  const base = hexToRgb(hex); if(!base) return {shades:[], tints:[], tones:[]};
+  const shades=[], tints=[], tones=[];
+  for(let i=1;i<=10;i++){
+    const f=i/11; // keep base visible in first steps
+    // Shades: multiply by (1-f)
+    const sR = Math.round(base.r*(1-f));
+    const sG = Math.round(base.g*(1-f));
+    const sB = Math.round(base.b*(1-f));
+    shades.push(rgbToHex(sR,sG,sB));
+    // Tints: mix toward white
+    const tR = Math.round(base.r + (255-base.r)*f);
+    const tG = Math.round(base.g + (255-base.g)*f);
+    const tB = Math.round(base.b + (255-base.b)*f);
+    tints.push(rgbToHex(tR,tG,tB));
+    // Tones: mix toward 50% gray (128)
+    const oR = Math.round(base.r*(1-f) + 128*f);
+    const oG = Math.round(base.g*(1-f) + 128*f);
+    const oB = Math.round(base.b*(1-f) + 128*f);
+    tones.push(rgbToHex(oR,oG,oB));
+  }
+  return {shades,tints,tones};
+}
+
+/* ---------- Harmonies + definitions ---------- */
+const HARMONY_DEFS = {
+  'Complementary': 'Two colors opposite on the color wheel, maximizing contrast and visual energy.',
+  'Analogous': 'Colors next to each other on the color wheel for smooth, cohesive palettes.',
+  'Monochromatic': 'One hue with variations in saturation and lightness for a unified look.',
+  'Split Complementary': 'A base color with two neighbors of its complement for balanced contrast.',
+  'Triadic': 'Three colors evenly spaced 120° apart for lively yet balanced schemes.',
+  'Tetradic': 'Four colors forming two complementary pairs (a rectangle) with rich variety.',
+  'Rectangle': 'Another four‑color scheme with two complementary pairs offset at 60°/120°.',
+  'Double Split Complementary': 'Two colors adjacent to the complement on both sides, offering high contrast with nuance.'
+};
+function harmonies(hex){
+  const rgb = hexToRgb(hex); if(!rgb) return {};
+  const {h,s,l} = rgbToHsl(rgb.r,rgb.g,rgb.b);
+  const ah = d => ( (h + d) % 360 + 360 ) % 360;
+  const sameSL = hh => hslToHex(hh, s, l);
+  return {
+    'Complementary': [ sameSL(ah(180)) ],
+    'Analogous': [ sameSL(ah(-30)), sameSL(ah(30)) ],
+    'Monochromatic': [ hslToHex(h, s*0.6, clamp(l*1.15,0,1)), hslToHex(h, clamp(s*1.1,0,1), clamp(l*0.75,0,1)) ],
+    'Split Complementary': [ sameSL(ah(150)), sameSL(ah(-150)) ],
+    'Triadic': [ sameSL(ah(120)), sameSL(ah(-120)) ],
+    'Tetradic': [ sameSL(ah(90)), sameSL(ah(180)), sameSL(ah(270)) ],
+    'Rectangle': [ sameSL(ah(60)), sameSL(ah(180)), sameSL(ah(240)) ],
+    'Double Split Complementary': [ sameSL(ah(150)), sameSL(ah(210)), sameSL(ah(-150)), sameSL(ah(-210)) ]
+  };
+}
+
+/* ---------- Palette UI ---------- */
+const paletteEl = document.getElementById('palette');
+const detailsPanel = document.getElementById('detailsPanel');
+const detailsTitle = document.getElementById('detailsTitle');
+const detailsContent = document.getElementById('detailsContent');
+
+const DEFAULTS = ['#3366cc','#ffcc33','#cc3333','#22aa88','#7c3aed'];
+
+function renderPalette(){
+  paletteEl.innerHTML='';
+  for(let i=0;i<5;i++){
+    const hex = DEFAULTS[i];
+    paletteEl.appendChild(makeSlot(i, hex));
+  }
+  selectSlot(0);
+}
+function makeSlot(index, initialHex){
+  const slot = document.createElement('div');
+  slot.className='slot';
+  slot.dataset.index=index;
+
+  const header = document.createElement('div');
+  header.className='slot-header';
+  const sw = document.createElement('div'); 
+  sw.className='swatch'; 
+  sw.style.background=initialHex;
+  header.appendChild(sw);
+
+  const title = document.createElement('div');
+  title.innerHTML = `<div style="font-weight:600">Color ${index+1}</div><div class="small" id="name-${index}">${nameFromHue(initialHex)}</div>`;
+  header.appendChild(title);
+  slot.appendChild(header);
+
+  const fields = document.createElement('div');
+  fields.className='fields';
+
+  const hexWrap = document.createElement('div');
+  hexWrap.innerHTML = `<label>Hex</label><input type="text" value="${initialHex}" id="hex-${index}" placeholder="#3366cc" />`;
+  fields.appendChild(hexWrap);
+
+  const pickWrap = document.createElement('div');
+  pickWrap.innerHTML = `<label>Picker</label><input type="color" value="${initialHex}" id="pick-${index}" />`;
+  fields.appendChild(pickWrap);
+
+  const rgbWrap = document.createElement('div');
+  rgbWrap.className='full';
+  const rgb0 = hexToRgb(initialHex);
+  rgbWrap.innerHTML = `<label>RGB</label><input type="text" readonly id="rgb-${index}" value="rgb(${rgb0.r}, ${rgb0.g}, ${rgb0.b})" />`;
+  fields.appendChild(rgbWrap);
+
+  slot.appendChild(fields);
+
+  const tip = document.createElement('div');
+  tip.className='click-tip';
+  tip.textContent='Tap anywhere on this card to view details ↓';
+  slot.appendChild(tip);
+
+  // Don’t select while typing in inputs
+  slot.addEventListener('click', (e)=>{
+    if(e.target.tagName.toLowerCase()==='input') return;
+    selectSlot(index);
+  });
+
+  const sync = (newHex)=>{
+    const h = normHex(newHex);
+    if(!h) return;
+
+    const rgb = hexToRgb(h);
+    sw.style.background = h;
+    document.getElementById(`rgb-${index}`).value = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+    document.getElementById(`name-${index}`).textContent = nameFromHue(h);
+
+    const hexInput = document.getElementById(`hex-${index}`);
+    const pickInput = document.getElementById(`pick-${index}`);
+
+    // Only rewrite the hex input if you’re NOT actively typing in it
+    if(document.activeElement !== hexInput && hexInput.value.toLowerCase() !== h){
+      hexInput.value = h;
+    }
+    if(pickInput.value.toLowerCase() !== h){
+      pickInput.value = h;
+    }
+
+    DEFAULTS[index] = h;
+    if(selectedIndex === index) renderDetails(h);
+  };
+
+  // Wire inputs (hex waits until you’re done typing)
+  setTimeout(()=>{
+    const hexInput = document.getElementById(`hex-${index}`);
+    const pickInput = document.getElementById(`pick-${index}`);
+
+    // Update only when you finish typing or press Enter
+    hexInput.addEventListener('change', ()=> sync(hexInput.value));
+
+    // Keep picker live
+    pickInput.addEventListener('input', ()=> sync(pickInput.value));
+  },0);
+
+  return slot;
+}
+
+let selectedIndex = null;
+function selectSlot(i){
+  selectedIndex = i;
+  [...paletteEl.children].forEach((el, idx)=>{
+    el.classList.toggle('selected', idx===i);
+  });
+  renderDetails(DEFAULTS[i]);
+}
+
+function chip(hex){
+  const rgb = hexToRgb(hex);
+  const el = document.createElement('div');
+  el.className='chip';
+  el.innerHTML = `
+    <div class="chip-top" style="background:${hex}"></div>
+    <div class="chip-meta">
+      <span>${hex}</span>
+      <span>rgb(${rgb.r}, ${rgb.g}, ${rgb.b})</span>
+    </div>`;
+  return el;
+}
+
+function renderDetails(hex){
+  detailsPanel.hidden = false;
+  const nm = nameFromHue(hex);
+  detailsTitle.textContent = `Selected color: ${nm} ${hex} (Color ${selectedIndex+1})`;
+  detailsContent.innerHTML = '';
+
+  // Variants
+  const {shades,tints,tones} = buildVariants(hex);
+  const variants = document.createElement('div');
+  variants.className='stack';
+  variants.innerHTML = `<div class="section-title" style="margin:0">Shades, tints, and tones</div>`;
+  const shadesRow = document.createElement('div'); shadesRow.className='swatch-row';
+  shades.forEach(h=>shadesRow.appendChild(chip(h)));
+  const tintsRow = document.createElement('div'); tintsRow.className='swatch-row';
+  tints.forEach(h=>tintsRow.appendChild(chip(h)));
+  const tonesRow = document.createElement('div'); tonesRow.className='swatch-row';
+  tones.forEach(h=>tonesRow.appendChild(chip(h)));
+  const shadesLabel = document.createElement('div'); shadesLabel.className='small'; shadesLabel.textContent='Shades (add black)';
+  const tintsLabel = document.createElement('div'); tintsLabel.className='small'; tintsLabel.textContent='Tints (add white)';
+  const tonesLabel = document.createElement('div'); tonesLabel.className='small'; tonesLabel.textContent='Tones (add gray)';
+  variants.appendChild(shadesLabel); variants.appendChild(shadesRow);
+  variants.appendChild(tintsLabel); variants.appendChild(tintsRow);
+  variants.appendChild(tonesLabel); variants.appendChild(tonesRow);
+  detailsContent.appendChild(variants);
+
+  // Harmonies
+  const hs = harmonies(hex);
+  const hWrap = document.createElement('div');
+  hWrap.className='harmony';
+  hWrap.innerHTML = `<div class="section-title" style="margin-top:8px">Color harmonies</div>`;
+  Object.keys(HARMONY_DEFS).forEach(type=>{
+    const row=document.createElement('div');
+    row.innerHTML = `<div class="h-title">${type}</div><div class="def">${HARMONY_DEFS[type]}</div>`;
+    const chips=document.createElement('div'); chips.className='swatch-row';
+    (hs[type]||[]).forEach(h=>chips.appendChild(chip(h)));
+    row.appendChild(chips);
+    hWrap.appendChild(row);
+  });
+  detailsContent.appendChild(hWrap);
+}
+
+/* ---------- Contrast checker ---------- */
+const bgHex = document.getElementById('bgHex');
+const txHex = document.getElementById('txHex');
+const ratioOut = document.getElementById('ratioOut');
+const sampleOut = document.getElementById('sampleOut');
+const suggestionsEl = document.getElementById('suggestions');
+document.getElementById('checkBtn').addEventListener('click', checkContrast);
+
+function checkContrast(){
+  const bg = normHex(bgHex.value);
+  const tx = normHex(txHex.value);
+  if(!bg || !tx){
+    ratioOut.innerHTML = `<span class="badge fail">Invalid hex</span>`;
+    return;
+  }
+  const r = contrastRatio(hexToRgb(bg), hexToRgb(tx));
+  const pass = r >= 7;
+  ratioOut.innerHTML = `Contrast ratio: <strong>${r.toFixed(2)}:1</strong> ` +
+    `<span class="badge ${pass?'ok':'fail'}">${pass?'AAA PASS':'AAA FAIL'}</span>`;
+
+  // sample preview
+  sampleOut.innerHTML = '';
+  const sample = document.createElement('div');
+  sample.style.background = bg;
+  sample.style.color = tx;
+  sample.className = 'sample';
+  sample.textContent = 'Sample text — Aa Bb Cc 123';
+  sampleOut.appendChild(sample);
+
+  // suggestions
+  suggestionsEl.innerHTML = '';
+  const sugg = suggestTextColors(bg, 7);
+  if(sugg.length===0){
+    const none = document.createElement('div');
+    none.className='small';
+    none.textContent = 'No AAA suggestions found.';
+    suggestionsEl.appendChild(none);
+  }else{
+    sugg.slice(0,8).forEach(({hex,ratio})=>{
+      const card = document.createElement('div');
+      card.className='suggest-card';
+      card.innerHTML = `
+        <div class="suggest-top" style="background:${bg}"></div>
+        <div class="suggest-meta">
+          <div><strong>${hex}</strong> • ${ratio.toFixed(2)}:1 <span class="badge ok">AAA</span></div>
+          <div class="small">On ${bg}</div>
+        </div>
+        <div class="sample" style="background:${bg}; color:${hex}">Sample Text</div>
+      `;
+      suggestionsEl.appendChild(card);
+    });
+  }
+}
+
+function suggestTextColors(bgHex, min=7){
+  const out=[];
+  const bg = hexToRgb(bgHex);
+  // 1) grayscale sweep (perceptual)
+  for(let L=0; L<=100; L+=5){
+    const l = L/100;
+    const hex = hslToHex(0,0,l);
+    const r = contrastRatio(bg, hexToRgb(hex));
+    if(r>=min) out.push({hex, ratio:r});
+  }
+  // 2) on‑hue dark and light variants (brand‑friendly)
+  const {h,s} = rgbToHsl(bg.r,bg.g,bg.b);
+  [0.1, 0.15, 0.2, 0.8, 0.85, 0.9].forEach(l=>{
+    const hex = hslToHex(h, clamp(s,0,1)*0.9, clamp(l,0,1));
+    const r = contrastRatio(bg, hexToRgb(hex));
+    if(r>=min) out.push({hex, ratio:r});
+  });
+  // 3) ensure pure black/near and pure white/near are considered
+  ['#000000','#111111','#222222','#ffffff','#f7f7f7','#eeeeee'].forEach(h=>{
+    const r = contrastRatio(bg, hexToRgb(h));
+    if(r>=min) out.push({hex:h, ratio:r});
+  });
+  // unique + sort
+  const uniq = Object.values(out.reduce((acc,cur)=>{acc[cur.hex]=cur; return acc;},{}));
+  uniq.sort((a,b)=>b.ratio-a.ratio);
+  return uniq;
+}
+
+/* ---------- Bootstrap ---------- */
+renderPalette();
+checkContrast();
+</script>
+</body>
+</html>
